@@ -1,0 +1,142 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+// generator client {
+//   provider = "prisma-client"
+//   output   = "../src/generated/prisma"
+// }
+
+// datasource db {
+//   provider = "postgresql"
+//   url      = env("DATABASE_URL")
+// }
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+
+// 0. Akun Admin Dashboard
+model Admin {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 1. Module Homepage
+model Carousel {
+  id        Int      @id @default(autoincrement())
+  image     String   // URL gambar
+  title     String
+  subtitle  String
+  createdAt DateTime @default(now())
+}
+
+model SambutanKades {
+  id          Int      @id @default(1) // Cukup 1 baris data saja (Upsert)
+  image       String
+  name        String
+  content     String   @db.Text
+  updatedAt   DateTime @updatedAt
+}
+
+model FooterInfo {
+  id        Int      @id @default(1) // Cukup 1 baris
+  address   String   @db.Text
+  phone     String
+  email     String
+  updatedAt DateTime @updatedAt
+}
+
+// 2. Module Profil Desa
+model ProfilDesa {
+  id                  Int      @id @default(1)
+  sejarahImage        String
+  sejarahDescription  String   @db.Text
+  visi                String   @db.Text
+  misi                String   @db.Text
+  baganOrganisasi     String   // URL Gambar bagan
+  videoProfilUrl      String?  // Link embedded video
+  updatedAt           DateTime @updatedAt
+}
+
+model PerangkatDesa {
+  id        Int      @id @default(autoincrement())
+  name      String
+  position  String   // Jabatan
+  photo     String   // URL Foto
+  order     Int      @default(0) // Untuk urutan tampilan
+}
+
+// 3. Module Artikel / Berita Desa
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  articles  Article[]
+}
+
+model Article {
+  id          Int      @id @default(autoincrement())
+  title       String
+  slug        String   @unique
+  thumbnail   String
+  content     String   @db.LongText
+  date        DateTime @default(now())
+  categoryId  Int
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+}
+
+// 4. Module Potensi Ekonomi
+model PotensiEkonomi {
+  id          Int            @id @default(autoincrement())
+  title       String
+  description String         @db.Text
+  images      PotensiImage[] // Relasi 1-ke-banyak (Min 1, Max 6 divalidasi di Express)
+  createdAt   DateTime       @default(now())
+}
+
+model PotensiImage {
+  id               Int            @id @default(autoincrement())
+  imageUrl         String
+  potensiEkonomiId Int
+  potensiEkonomi   PotensiEkonomi @relation(fields: [potensiEkonomiId], references: [id], onDelete: Cascade)
+}
+
+// 5. Pemetaan
+model BatasWilayah {
+  id        Int      @id @default(1)
+  utara     String
+  timur     String
+  selatan   String
+  barat     String
+  updatedAt DateTime @updatedAt
+}
+
+model PetaDesa {
+  id        Int      @id @default(autoincrement())
+  type      String   @unique // Contoh: ADMIN, DUSUN, PENGGUNA_LAHAN, PHBS, LERENG, KESESUAIAN_LAHAN
+  title     String
+  image     String   // URL Gambar Peta
+  updatedAt DateTime @updatedAt
+}
+
+// 6. Infografis Kependudukan (Hasil Agregasi Excel)
+model KependudukanStat {
+  id        Int      @id @default(autoincrement())
+  type      String   // 'UMUR', 'DUSUN', 'PENDIDIKAN', 'PEKERJAAN', 'PERKAWINAN', 'AGAMA'
+  label     String   // Contoh: '0-5 thn', 'SD', 'Islam', 'Dusun 1'
+  maleCount   Int    @default(0) // Jumlah Laki-laki
+  femaleCount Int    @default(0) // Jumlah Perempuan
+  totalCount  Int    @default(0) // Total Jiwa (bisa male + female atau total saja untuk chart pie)
+}
