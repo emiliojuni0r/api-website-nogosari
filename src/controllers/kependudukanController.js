@@ -18,8 +18,10 @@ export const uploadKependudukanExcel = async (req, res) => {
         if (!sheetDataFix) {
             return res.status(400).json({ message: "Lembar kerja 'DATA FIX' tidak ditemukan di dalam Excel." });
         }
-        
+
         const dataFixRows = xlsx.utils.sheet_to_json(sheetDataFix);
+
+        console.info(Object.keys(dataFixRows[0]));
 
         // Wadah akumulator memori untuk kalkulasi data statistik
         const stats = {
@@ -31,8 +33,8 @@ export const uploadKependudukanExcel = async (req, res) => {
         };
 
         dataFixRows.forEach(row => {
-            const gender = String(row.jenis_klmn || '').toUpperCase().trim(); // 'L' atau 'P'
-            const umur = parseInt(row.umur);
+            const gender = String(row.jenis_klmin || '').toUpperCase().trim(); // 'L' atau 'P'
+            const umur = parseInt(row.Umur);
             const agama = String(row.agama || 'Lainnya').trim();
             const pendidikan = String(row.pddk_akh || 'Tidak Diketahui').trim();
             const pekerjaan = String(row.jenis_pkrjn || 'Belum/Tidak Bekerja').trim();
@@ -69,7 +71,7 @@ export const uploadKependudukanExcel = async (req, res) => {
         // ----------------------------------------------------
         const sheetRekap = workbook.Sheets['(1) REKAP'];
         const dusunStats = [];
-        
+
         if (sheetRekap) {
             const rekapRows = xlsx.utils.sheet_to_json(sheetRekap);
             rekapRows.forEach(row => {
