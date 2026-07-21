@@ -16,30 +16,63 @@ export const getArticles = async (req, res) => {
     try {
         // Ambil query params dari URL (Contoh: /api/artikel?page=1&limit=5&category=kegiatan)
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 6; // Default 6 artikel per halaman
+        const limit = parseInt(req.query.limit) || 12; // Default 6 artikel per halaman
         const categorySlug = req.query.category || null;
 
         const skip = (page - 1) * limit;
 
+        const search = req.query.search || "";
+
         // Validasi kondisi filter jika ada category
-        const whereCondition = categorySlug
-            ? { category: { name: { contains: categorySlug } } }
-            : {};
+        const whereCondition = {
+            ...(categorySlug && {
+                category: {
+                    name: {
+                        contains: categorySlug,
+                        // mode: "insensitive",
+                    },
+                },
+            }),
+
+            ...(search && {
+                OR: [
+                    {
+                        title: {
+                            contains: search,
+                            // mode: "insensitive",
+                        },
+                    },
+                    {
+                        content: {
+                            contains: search,
+                            // mode: "insensitive",
+                        },
+                    },
+                ],
+            }),
+        };
 
         // Ambil data dan hitung total data secara bersamaan (Parallel Queries)
         const [articles, totalData] = await prisma.$transaction([
             prisma.article.findMany({
                 where: whereCondition,
-                skip: skip,
+                skip,
                 take: limit,
                 include: {
                     category: {
-                        select: { id: true, name: true }
-                    }
+                        select: {
+                            id: true,
+                            name: true,
+                        },
+                    },
                 },
-                orderBy: { date: 'desc' } // Artikel terbaru dahulu
+                orderBy: {
+                    date: "desc",
+                },
             }),
-            prisma.article.count({ where: whereCondition })
+            prisma.article.count({
+                where: whereCondition,
+            }),
         ]);
 
         const totalPage = Math.ceil(totalData / limit);
