@@ -12,7 +12,7 @@ export const uploadKependudukanExcel = async (req, res) => {
         const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
 
         // ----------------------------------------------------
-        // KELOMPOK A: PROSES SHEET 'DATA FIX' (Umur, Agama, Pendidikan, Pekerjaan, Perkawinan)
+        // KELOMPOK A: PROSES SHEET 'DATA FIX'
         // ----------------------------------------------------
         const sheetDataFix = workbook.Sheets['DATA FIX'];
         if (!sheetDataFix) {
@@ -21,26 +21,38 @@ export const uploadKependudukanExcel = async (req, res) => {
 
         const dataFixRows = xlsx.utils.sheet_to_json(sheetDataFix);
 
-        console.info(Object.keys(dataFixRows[0]));
-
         // Wadah akumulator memori untuk kalkulasi data statistik
         const stats = {
             UMUR: {},
             PENDIDIKAN: {},
             PEKERJAAN: {},
             PERKAWINAN: {},
-            AGAMA: {}
+            AGAMA: {},
+            DUSUN: {} // Tambahkan wadah untuk Dusun
         };
 
+        // Menggunakan Set untuk menyimpan no_kk unik (Kepala Keluarga)
+        const uniqueKK = new Set();
+
         dataFixRows.forEach(row => {
-            const gender = String(row.jenis_klmin || '').toUpperCase().trim(); // 'L' atau 'P'
+            // Mengatasi kemungkinan typo jenis_klmn / jenis_klmin
+            const gender = String(row.jenis_klmn || row.jenis_klmin || '').toUpperCase().trim();
             const umur = parseInt(row.Umur);
             const agama = String(row.agama || 'Lainnya').trim();
             const pendidikan = String(row.pddk_akh || 'Tidak Diketahui').trim();
             const pekerjaan = String(row.jenis_pkrjn || 'Belum/Tidak Bekerja').trim();
             const statusKawin = String(row.stat_kwn || 'Belum Kawin').trim();
 
-            // Aturan pengelompokan umur sesuai spek ChartJS Anda
+            // Ambil data Dusun dan No KK
+            const dusun = String(row['alamat (Dusun)'] || 'Tidak Diketahui').trim();
+            const noKK = row.no_kk || row.NO_KK || row.No_KK;
+
+            // Masukkan no_kk ke dalam Set (otomatis mengabaikan duplikat)
+            if (noKK) {
+                uniqueKK.add(noKK);
+            }
+
+            // Aturan pengelompokan umur sesuai spek ChartJS
             let kelompokUmur = '65+ thn';
             if (umur <= 5) kelompokUmur = '0-5 thn';
             else if (umur <= 12) kelompokUmur = '6-12 thn';
@@ -64,35 +76,11 @@ export const uploadKependudukanExcel = async (req, res) => {
             akumulasi('PENDIDIKAN', pendidikan);
             akumulasi('PEKERJAAN', pekerjaan);
             akumulasi('PERKAWINAN', statusKawin);
+            akumulasi('DUSUN', dusun); // Agregasi Dusun secara otomatis
         });
 
         // ----------------------------------------------------
-        // KELOMPOK B: PROSES SHEET '(1) REKAP' (Untuk Grafik Dusun)
-        // ----------------------------------------------------
-        const sheetRekap = workbook.Sheets['(1) REKAP'];
-        const dusunStats = [];
-
-        if (sheetRekap) {
-            const rekapRows = xlsx.utils.sheet_to_json(sheetRekap);
-            rekapRows.forEach(row => {
-                const namaDusun = row['Nama Dusun'] || row['nama_dusun'] || row['Dusun'];
-                const wniL = parseInt(row['WNI L'] || row['wni_l'] || 0);
-                const wniP = parseInt(row['WNI P'] || row['wni_p'] || 0);
-
-                if (namaDusun) {
-                    dusunStats.push({
-                        type: 'DUSUN',
-                        label: String(namaDusun).trim(),
-                        maleCount: wniL,
-                        femaleCount: wniP,
-                        totalCount: wniL + wniP
-                    });
-                }
-            });
-        }
-
-        // ----------------------------------------------------
-        // KELOMPOK C: TRANSAKSI DATABASE (Hapus data lama, Tulis baru)
+        // KELOMPOK B: TRANSAKSI DATABASE (Hapus data lama, Tulis baru)
         // ----------------------------------------------------
         // Memakai Prisma Transaction agar jika ada salah satu proses gagal, database tidak rusak/parsial
         await prisma.$transaction([
@@ -100,12 +88,15 @@ export const uploadKependudukanExcel = async (req, res) => {
 
             prisma.kependudukanStat.createMany({
                 data: [
-                    ...dusunStats,
+                    ...Object.keys(stats.DUSUN).map(label => ({ type: 'DUSUN', label, maleCount: stats.DUSUN[label].male, femaleCount: stats.DUSUN[label].female, totalCount: stats.DUSUN[label].total })),
                     ...Object.keys(stats.UMUR).map(label => ({ type: 'UMUR', label, maleCount: stats.UMUR[label].male, femaleCount: stats.UMUR[label].female, totalCount: stats.UMUR[label].total })),
                     ...Object.keys(stats.AGAMA).map(label => ({ type: 'AGAMA', label, totalCount: stats.AGAMA[label].total })),
                     ...Object.keys(stats.PENDIDIKAN).map(label => ({ type: 'PENDIDIKAN', label, totalCount: stats.PENDIDIKAN[label].total })),
                     ...Object.keys(stats.PEKERJAAN).map(label => ({ type: 'PEKERJAAN', label, totalCount: stats.PEKERJAAN[label].total })),
                     ...Object.keys(stats.PERKAWINAN).map(label => ({ type: 'PERKAWINAN', label, totalCount: stats.PERKAWINAN[label].total })),
+
+                    // Simpan Total KK sebagai record spesial
+                    { type: 'SUMMARY', label: 'TOTAL_KK', totalCount: uniqueKK.size }
                 ]
             })
         ]);
@@ -130,8 +121,14 @@ export const getKependudukanData = async (req, res) => {
         const agamaRecords = records.filter(r => r.type === 'AGAMA');
         const perkawinanRecords = records.filter(r => r.type === 'PERKAWINAN');
 
-        // Total Penduduk & Total Kepala Keluarga (Agregasi global)
-        const totalPenduduk = records.filter(r => r.type === 'DUSUN').reduce((sum, item) => sum + item.totalCount, 0);
+        // Ambil record spesial KK
+        const kkRecord = records.find(r => r.type === 'SUMMARY' && r.label === 'TOTAL_KK');
+
+        // Agregasi Data Global (Menggunakan data dari Dusun yang sudah dihitung)
+        const totalPenduduk = dusunRecords.reduce((sum, item) => sum + item.totalCount, 0);
+        const totalLakiLaki = dusunRecords.reduce((sum, item) => sum + (item.maleCount || 0), 0);
+        const totalPerempuan = dusunRecords.reduce((sum, item) => sum + (item.femaleCount || 0), 0);
+        const totalKK = kkRecord ? kkRecord.totalCount : 0;
 
         // 1. Format Objek untuk Grafik Umur (Bar Chart Berlapis Ganda)
         const labelsUmur = ['0-5 thn', '6-12 thn', '13-21 thn', '22-49 thn', '50-64 thn', '65+ thn'];
@@ -222,7 +219,10 @@ export const getKependudukanData = async (req, res) => {
         res.status(200).json({
             message: "Berhasil memuat statistik kependudukan desa",
             summary: {
-                totalPenduduk: totalPenduduk
+                totalPenduduk,
+                totalLakiLaki,
+                totalPerempuan,
+                totalKK
             },
             charts: {
                 chartDataUmur,
