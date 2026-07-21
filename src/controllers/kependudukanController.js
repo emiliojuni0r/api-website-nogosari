@@ -11,9 +11,6 @@ export const uploadKependudukanExcel = async (req, res) => {
         // Membaca file dari buffer RAM
         const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
 
-        // ----------------------------------------------------
-        // KELOMPOK A: PROSES SHEET 'DATA FIX'
-        // ----------------------------------------------------
         const sheetDataFix = workbook.Sheets['DATA FIX'];
         if (!sheetDataFix) {
             return res.status(400).json({ message: "Lembar kerja 'DATA FIX' tidak ditemukan di dalam Excel." });
@@ -23,36 +20,53 @@ export const uploadKependudukanExcel = async (req, res) => {
 
         // Wadah akumulator memori untuk kalkulasi data statistik
         const stats = {
-            UMUR: {},
-            PENDIDIKAN: {},
-            PEKERJAAN: {},
-            PERKAWINAN: {},
-            AGAMA: {},
-            DUSUN: {} // Tambahkan wadah untuk Dusun
+            UMUR: {}, PENDIDIKAN: {}, PEKERJAAN: {}, PERKAWINAN: {}, AGAMA: {}, DUSUN: {}
         };
 
-        // Menggunakan Set untuk menyimpan no_kk unik (Kepala Keluarga)
         const uniqueKK = new Set();
 
         dataFixRows.forEach(row => {
-            // Mengatasi kemungkinan typo jenis_klmn / jenis_klmin
-            const gender = String(row.jenis_klmn || row.jenis_klmin || '').toUpperCase().trim();
-            const umur = parseInt(row.Umur);
-            const agama = String(row.agama || 'Lainnya').trim();
-            const pendidikan = String(row.pddk_akh || 'Tidak Diketahui').trim();
-            const pekerjaan = String(row.jenis_pkrjn || 'Belum/Tidak Bekerja').trim();
-            const statusKawin = String(row.stat_kwn || 'Belum Kawin').trim();
-
-            // Ambil data Dusun dan No KK
-            const dusun = String(row['alamat (Dusun)'] || 'Tidak Diketahui').trim();
-            const noKK = row.no_kk || row.NO_KK || row.No_KK;
-
-            // Masukkan no_kk ke dalam Set (otomatis mengabaikan duplikat)
-            if (noKK) {
-                uniqueKK.add(noKK);
+            // 1. FILTERING DATA KOTOR (Lewati baris yang isinya cuma nomor kolom)
+            const rawGender = String(row.jenis_klmn || row.jenis_klmin || '').toUpperCase().trim();
+            // Jika kolom gender isinya bukan L atau P (misal angka "4"), skip baris ini!
+            if (!['L', 'P', 'LAKI-LAKI', 'PEREMPUAN'].includes(rawGender)) {
+                return;
             }
+            const gender = (rawGender === 'LAKI-LAKI' || rawGender === 'L') ? 'L' : 'P';
+            const umur = parseInt(row.Umur) || 0;
 
-            // Aturan pengelompokan umur sesuai spek ChartJS
+            // 2. CLEANING DATA (Standarisasi Huruf Besar & Penyatuan Nama)
+
+            // DUSUN: Ubah ke uppercase dan hapus kata "DUSUN " di awal jika ada
+            let dusun = String(row['alamat (Dusun)'] || 'TIDAK DIKETAHUI').toUpperCase().trim();
+            dusun = dusun.replace(/^DUSUN\s+/i, '');
+
+            // Opsional: Satukan typo spesifik
+            if (dusun === 'SONGAI KENIK') dusun = 'SUNGAI KENIK';
+
+            // AGAMA & PERKAWINAN: Cukup di-uppercase agar seragam
+            let agama = String(row.agama || 'LAINNYA').toUpperCase().trim();
+            let statusKawin = String(row.stat_kwn || 'BELUM KAWIN').toUpperCase().trim();
+
+            // PENDIDIKAN: Uppercase & Satukan label yang bermakna sama
+            let pendidikan = String(row.pddk_akh || 'TIDAK DIKETAHUI').toUpperCase().trim();
+            if (['BELUM SEKOLAH', 'BELUM/TIDAK BERSEKOLAH'].includes(pendidikan)) pendidikan = 'TIDAK/BELUM SEKOLAH';
+            if (pendidikan === 'SD/SEDERAJAT') pendidikan = 'TAMAT SD/SEDERAJAT';
+            if (pendidikan === 'TAMAT SLTA/SEDERAJAT') pendidikan = 'SLTA/SEDERAJAT';
+            if (['DIPLOMA IV/STRATA 1', 'S1/SEDERAJAT', 'SARJANA/S1'].includes(pendidikan)) pendidikan = 'DIPLOMA IV/STRATA I';
+
+            // PEKERJAAN: Uppercase & Satukan label yang bermakna sama
+            let pekerjaan = String(row.jenis_pkrjn || 'BELUM/TIDAK BEKERJA').toUpperCase().trim();
+            if (pekerjaan === 'TIDAK/BELUM BEKERJA') pekerjaan = 'BELUM/TIDAK BEKERJA';
+            if (pekerjaan === 'IBU RUMAH TANGGA') pekerjaan = 'MENGURUS RUMAH TANGGA';
+            if (pekerjaan === 'BURUH TANI') pekerjaan = 'BURUH TANI/PERKEBUNAN';
+
+
+            // Masukkan no_kk ke dalam Set
+            const noKK = row.no_kk || row.NO_KK || row.No_KK;
+            if (noKK) uniqueKK.add(noKK);
+
+            // Aturan pengelompokan umur
             let kelompokUmur = '65+ thn';
             if (umur <= 5) kelompokUmur = '0-5 thn';
             else if (umur <= 12) kelompokUmur = '6-12 thn';
@@ -60,14 +74,14 @@ export const uploadKependudukanExcel = async (req, res) => {
             else if (umur <= 49) kelompokUmur = '22-49 thn';
             else if (umur <= 64) kelompokUmur = '50-64 thn';
 
-            // Pembantu fungsi (helper) untuk mengagregasikan hitungan ke memori
+            // Pembantu fungsi akumulasi
             const akumulasi = (kategori, label) => {
                 if (!label) return;
                 if (!stats[kategori][label]) {
                     stats[kategori][label] = { male: 0, female: 0, total: 0 };
                 }
-                if (gender === 'L' || gender === 'LAKI-LAKI') stats[kategori][label].male++;
-                if (gender === 'P' || gender === 'PEREMPUAN') stats[kategori][label].female++;
+                if (gender === 'L') stats[kategori][label].male++;
+                if (gender === 'P') stats[kategori][label].female++;
                 stats[kategori][label].total++;
             };
 
@@ -76,15 +90,12 @@ export const uploadKependudukanExcel = async (req, res) => {
             akumulasi('PENDIDIKAN', pendidikan);
             akumulasi('PEKERJAAN', pekerjaan);
             akumulasi('PERKAWINAN', statusKawin);
-            akumulasi('DUSUN', dusun); // Agregasi Dusun secara otomatis
+            akumulasi('DUSUN', dusun);
         });
 
-        // ----------------------------------------------------
-        // KELOMPOK B: TRANSAKSI DATABASE (Hapus data lama, Tulis baru)
-        // ----------------------------------------------------
-        // Memakai Prisma Transaction agar jika ada salah satu proses gagal, database tidak rusak/parsial
+        // Transaksi Database Prisma... (Sama seperti sebelumnya)
         await prisma.$transaction([
-            prisma.kependudukanStat.deleteMany({}), // Kosongkan statistik lama terlebih dahulu
+            prisma.kependudukanStat.deleteMany({}),
 
             prisma.kependudukanStat.createMany({
                 data: [
@@ -95,7 +106,6 @@ export const uploadKependudukanExcel = async (req, res) => {
                     ...Object.keys(stats.PEKERJAAN).map(label => ({ type: 'PEKERJAAN', label, totalCount: stats.PEKERJAAN[label].total })),
                     ...Object.keys(stats.PERKAWINAN).map(label => ({ type: 'PERKAWINAN', label, totalCount: stats.PERKAWINAN[label].total })),
 
-                    // Simpan Total KK sebagai record spesial
                     { type: 'SUMMARY', label: 'TOTAL_KK', totalCount: uniqueKK.size }
                 ]
             })
