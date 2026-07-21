@@ -19,3 +19,18 @@ pnpm-debug.log*
 # OS files
 .DS_Store
 Thumbs.db
+
+
+# Ignore semua isi folder uploads
+uploads/**
+
+# Tapi jangan ignore foldernya
+!uploads/
+!uploads/articles/
+!uploads/homepage/
+!uploads/potensi/
+!uploads/profil/
+!uploads/pemetaan/
+
+# Biar folder kosong tetap ikut git
+!uploads/**/.gitkeep
