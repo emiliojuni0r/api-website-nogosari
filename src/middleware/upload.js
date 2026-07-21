@@ -32,3 +32,106 @@ export const uploadArticleImage = multer({
     limits: { fileSize: 10 * 1024 * 1024 }, // Batasi ukuran file maks 2MB
     fileFilter: fileFilter
 }).single('thumbnail'); // 'thumbnail' adalah nama key/field yang dikirim dari frontend
+
+
+// 
+// 
+
+// Konfigurasi storage untuk gambar Profil & Perangkat
+const storageProfil = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/profil/');
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const uploadProfil = multer({
+    storage: storageProfil,
+    limits: { fileSize: 2 * 1024 * 1024 }, // Maksimal 2MB
+    fileFilter: fileFilter // menggunakan fileFilter yang sama dengan artikel
+});
+
+// 1. Upload untuk Profil Desa (Menangkap 2 field gambar berbeda sekaligus)
+export const uploadProfilImages = uploadProfil.fields([
+    { name: 'sejarahImage', maxCount: 1 },
+    { name: 'baganOrganisasi', maxCount: 1 }
+]);
+
+// 2. Upload untuk Foto Perangkat Desa
+export const uploadPerangkatImage = uploadProfil.single('photo');
+
+// 
+// 
+
+// Konfigurasi storage untuk gambar di Homepage (Sambutan & Carousel)
+const storageHomepage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/homepage/');
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const uploadHomepage = multer({
+    storage: storageHomepage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // Maksimal 2MB
+    fileFilter: fileFilter // filter tipe gambar yang sama
+});
+
+// Upload untuk Foto Sambutan Kepala Desa
+export const uploadSambutanImage = uploadHomepage.single('image');
+
+//
+// 
+
+export const uploadCarouselImage = uploadHomepage.single('image');
+
+// 
+// 
+
+// Konfigurasi storage untuk gambar Potensi Desa
+const storagePotensi = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/potensi/');
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const uploadPotensi = multer({
+    storage: storagePotensi,
+    limits: { fileSize: 10 * 1024 * 1024 }, // Maksimal 2MB per gambar
+    fileFilter: fileFilter
+});
+
+// Menangkap array gambar dengan nama field 'images', maksimal 6 file
+export const uploadPotensiImages = uploadPotensi.array('images', 6);
+
+// 
+// 
+
+const storagePemetaan = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/pemetaan/');
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const uploadPemetaan = multer({
+    storage: storagePemetaan,
+    limits: { fileSize: 20 * 1024 * 1024 }, // Maksimal 20MB khusus untuk peta
+    fileFilter: fileFilter
+});
+
+// Upload untuk Foto Peta (1 gambar per upload)
+export const uploadPetaImage = uploadPemetaan.single('image');
