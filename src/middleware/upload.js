@@ -152,7 +152,7 @@ const storageApbdes = multer.diskStorage({
 
 const uploadApbdes = multer({
     storage: storageApbdes,
-    limits: { fileSize: 5 * 1024 * 1024 }, // Limit 5MB agar infografis tidak pecah
+    limits: { fileSize: 15 * 1024 * 1024 }, // Limit 15MB agar infografis tidak pecah
     fileFilter: fileFilter
 });
 
