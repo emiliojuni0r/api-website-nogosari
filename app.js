@@ -17,6 +17,7 @@ import potensiRoutes from './src/routes/potensiRoutes.js';
 import pemetaanRoutes from './src/routes/pemetaanRoutes.js';
 import footerRoutes from './src/routes/footerRoutes.js';
 import categoryArtikelRoutes from './src/routes/categoryArtikelRoutes.js';
+import apbdesRoutes from './src/routes/apbdesRoutes.js';
 import path from 'path';
 
 dotenv.config();
@@ -64,6 +65,7 @@ app.use('/api/potensi', potensiRoutes);
 app.use('/api/pemetaan', pemetaanRoutes);
 app.use('/api/footer', footerRoutes);
 app.use('/api/categoryartikel', categoryArtikelRoutes);
+app.use('/api/apbdes', apbdesRoutes);
 
 
 // CENTRALIZED ERROR HANDLER

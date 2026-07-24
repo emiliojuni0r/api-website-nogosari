@@ -135,3 +135,29 @@ const uploadPemetaan = multer({
 
 // Upload untuk Foto Peta (1 gambar per upload)
 export const uploadPetaImage = uploadPemetaan.single('image');
+
+
+// 
+// 
+
+const storageApbdes = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/apbdes/');
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const uploadApbdes = multer({
+    storage: storageApbdes,
+    limits: { fileSize: 5 * 1024 * 1024 }, // Limit 5MB agar infografis tidak pecah
+    fileFilter: fileFilter
+});
+
+// Menangkap 2 field gambar sekaligus untuk APBDES
+export const uploadApbdesImages = uploadApbdes.fields([
+    { name: 'fotoApbdes', maxCount: 1 },
+    { name: 'fotoRealisasi', maxCount: 1 }
+]);

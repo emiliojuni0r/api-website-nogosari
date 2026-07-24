@@ -14,7 +14,6 @@
 //   url      = env("DATABASE_URL")
 // }
 
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -23,7 +22,6 @@ datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
 }
-
 
 // 0. Akun Admin Dashboard
 model Admin {
@@ -37,18 +35,18 @@ model Admin {
 // 1. Module Homepage
 model Carousel {
   id        Int      @id @default(autoincrement())
-  image     String   // URL gambar
+  image     String // URL gambar
   title     String
   subtitle  String
   createdAt DateTime @default(now())
 }
 
 model SambutanKades {
-  id          Int      @id @default(1) // Cukup 1 baris data saja (Upsert)
-  image       String
-  name        String
-  content     String   @db.Text
-  updatedAt   DateTime @updatedAt
+  id        Int      @id @default(1) // Cukup 1 baris data saja (Upsert)
+  image     String
+  name      String
+  content   String   @db.Text
+  updatedAt DateTime @updatedAt
 }
 
 model FooterInfo {
@@ -61,40 +59,40 @@ model FooterInfo {
 
 // 2. Module Profil Desa
 model ProfilDesa {
-  id                  Int      @id @default(1)
-  sejarahImage        String
-  sejarahDescription  String   @db.Text
-  visi                String   @db.Text
-  misi                String   @db.Text
-  baganOrganisasi     String   // URL Gambar bagan
-  videoProfilUrl      String?  // Link embedded video
-  updatedAt           DateTime @updatedAt
+  id                 Int      @id @default(1)
+  sejarahImage       String
+  sejarahDescription String   @db.Text
+  visi               String   @db.Text
+  misi               String   @db.Text
+  baganOrganisasi    String // URL Gambar bagan
+  videoProfilUrl     String? // Link embedded video
+  updatedAt          DateTime @updatedAt
 }
 
 model PerangkatDesa {
-  id        Int      @id @default(autoincrement())
-  name      String
-  position  String   // Jabatan
-  photo     String   // URL Foto
-  order     Int      @default(0) // Untuk urutan tampilan
+  id       Int    @id @default(autoincrement())
+  name     String
+  position String // Jabatan
+  photo    String // URL Foto
+  order    Int    @default(0) // Untuk urutan tampilan
 }
 
 // 3. Module Artikel / Berita Desa
 model Category {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  articles  Article[]
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  articles Article[]
 }
 
 model Article {
-  id          Int      @id @default(autoincrement())
-  title       String
-  slug        String   @unique
-  thumbnail   String
-  content     String   @db.LongText
-  date        DateTime @default(now())
-  categoryId  Int
-  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  id         Int      @id @default(autoincrement())
+  title      String
+  slug       String   @unique
+  thumbnail  String
+  content    String   @db.LongText
+  date       DateTime @default(now())
+  categoryId Int
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 }
 
 // 4. Module Potensi Ekonomi
@@ -127,16 +125,25 @@ model PetaDesa {
   id        Int      @id @default(autoincrement())
   type      String   @unique // Contoh: ADMIN, DUSUN, PENGGUNA_LAHAN, PHBS, LERENG, KESESUAIAN_LAHAN
   title     String
-  image     String   // URL Gambar Peta
+  image     String // URL Gambar Peta
   updatedAt DateTime @updatedAt
 }
 
 // 6. Infografis Kependudukan (Hasil Agregasi Excel)
 model KependudukanStat {
-  id        Int      @id @default(autoincrement())
-  type      String   // 'UMUR', 'DUSUN', 'PENDIDIKAN', 'PEKERJAAN', 'PERKAWINAN', 'AGAMA'
-  label     String   // Contoh: '0-5 thn', 'SD', 'Islam', 'Dusun 1'
+  id          Int    @id @default(autoincrement())
+  type        String // 'UMUR', 'DUSUN', 'PENDIDIKAN', 'PEKERJAAN', 'PERKAWINAN', 'AGAMA'
+  label       String // Contoh: '0-5 thn', 'SD', 'Islam', 'Dusun 1'
   maleCount   Int    @default(0) // Jumlah Laki-laki
   femaleCount Int    @default(0) // Jumlah Perempuan
   totalCount  Int    @default(0) // Total Jiwa (bisa male + female atau total saja untuk chart pie)
+}
+
+model Apbdes {
+  id              Int      @id @default(1)
+  fotoApbdes      String // URL Gambar Infografis APBDES
+  narasiApbdes    String   @db.Text
+  fotoRealisasi   String // URL Gambar Infografis Realisasi
+  narasiRealisasi String   @db.Text
+  updatedAt       DateTime @updatedAt
 }
