@@ -126,6 +126,8 @@ export const getKependudukanData = async (req, res) => {
     try {
         const records = await prisma.kependudukanStat.findMany();
 
+        const lastUpdated = records.length > 0 ? records[0].updatedAt : null;
+
         const umurRecords = records.filter(r => r.type === 'UMUR');
         const dusunRecords = records.filter(r => r.type === 'DUSUN');
         const pendidikanRecords = records.filter(r => r.type === 'PENDIDIKAN');
@@ -196,6 +198,7 @@ export const getKependudukanData = async (req, res) => {
 
         res.status(200).json({
             message: "Berhasil memuat statistik kependudukan desa",
+            lastUpdated,
             summary: {
                 totalPenduduk,
                 totalLakiLaki,

@@ -131,12 +131,13 @@ model PetaDesa {
 
 // 6. Infografis Kependudukan (Hasil Agregasi Excel)
 model KependudukanStat {
-  id          Int    @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   type        String // 'UMUR', 'DUSUN', 'PENDIDIKAN', 'PEKERJAAN', 'PERKAWINAN', 'AGAMA'
   label       String // Contoh: '0-5 thn', 'SD', 'Islam', 'Dusun 1'
-  maleCount   Int    @default(0) // Jumlah Laki-laki
-  femaleCount Int    @default(0) // Jumlah Perempuan
-  totalCount  Int    @default(0) // Total Jiwa (bisa male + female atau total saja untuk chart pie)
+  maleCount   Int      @default(0) // Jumlah Laki-laki
+  femaleCount Int      @default(0) // Jumlah Perempuan
+  totalCount  Int      @default(0) // Total Jiwa (bisa male + female atau total saja untuk chart pie)
+  updatedAt   DateTime @updatedAt
 }
 
 model Apbdes {
