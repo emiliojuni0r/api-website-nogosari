@@ -8,7 +8,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "node index.js",
     "seed-admin": "node prisma/seed.js",
-    "seed-category": "node prisma/seedCategory.js"
+    "seed-category": "node prisma/seedCategory.js",
+    "seed-potensi": "node prisma/seedPotensi.js"
   },
   "author": "",
   "license": "ISC",
