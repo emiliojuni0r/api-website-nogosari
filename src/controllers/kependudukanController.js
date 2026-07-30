@@ -1,6 +1,40 @@
 import xlsx from 'xlsx';
 import prisma from '../config/db.js';
 
+// --- FUNGSI HELPER UNTUK MEMBACA SHEET LAPORAN (Reg Lahir & Mati) ---
+const hitungDataLaporan = (sheet) => {
+    if (!sheet) return 0;
+    
+    // Pada gambar Anda, Header tabel selalu berada di baris ke-5 (index 4)
+    const rows = xlsx.utils.sheet_to_json(sheet, { range: 4 });
+    let count = 0;
+
+    for (const row of rows) {
+        // Gabungkan semua nilai di baris ini menjadi satu teks untuk mempermudah pengecekan
+        const rowString = Object.values(row).join(' ').toUpperCase();
+
+        // 1. Cek jika bulan tersebut tidak ada data (Ada teks NIHIL besar)
+        if (rowString.includes('NIHIL')) {
+            return 0; // Langsung kembalikan 0
+        }
+
+        // 2. Berhenti menghitung jika sudah sampai di area tanda tangan pengesahan
+        if (rowString.includes('MENGETAHUI') || rowString.includes('KEPALA DESA') || rowString.includes('SEKRETARIS')) {
+            break;
+        }
+
+        // 3. Validasi baris: Data yang sah harus punya Nomor Urut dan Nama
+        const no = row['NO'] || row['NO.'] || row['no'];
+        const nama = row['NAMA'] || row['nama'] || row['Nama'];
+
+        if (no !== undefined && !isNaN(parseInt(no)) && nama) {
+            count++;
+        }
+    }
+    return count;
+};
+
+
 // 1. UPLOAD & OLAH FILE EXCEL (Admin - Protected)
 export const uploadKependudukanExcel = async (req, res) => {
     try {
@@ -8,7 +42,6 @@ export const uploadKependudukanExcel = async (req, res) => {
             return res.status(400).json({ message: "Berkas Excel wajib diunggah." });
         }
 
-        // Membaca file dari buffer RAM
         const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
 
         const sheetDataFix = workbook.Sheets['DATA FIX'];
@@ -18,7 +51,14 @@ export const uploadKependudukanExcel = async (req, res) => {
 
         const dataFixRows = xlsx.utils.sheet_to_json(sheetDataFix);
 
-        // Wadah akumulator memori untuk kalkulasi data statistik (TAMBAHKAN RT DI SINI)
+        // --- TAMBAHAN: PROSES SHEET LAHIR & MATI MENGGUNAKAN FUNGSI HELPER ---
+        const sheetLahir = workbook.Sheets['Reg. Lahir'];
+        const sheetMati = workbook.Sheets['Reg. Mati'];
+
+        const totalKelahiran = hitungDataLaporan(sheetLahir);
+        const totalKematian = hitungDataLaporan(sheetMati);
+        // ---------------------------------------------------------------------
+
         const stats = {
             UMUR: {}, PENDIDIKAN: {}, PEKERJAAN: {}, PERKAWINAN: {}, AGAMA: {}, DUSUN: {}, RT: {}
         };
@@ -26,7 +66,6 @@ export const uploadKependudukanExcel = async (req, res) => {
         const uniqueKK = new Set();
 
         dataFixRows.forEach(row => {
-            // 1. FILTERING DATA KOTOR
             const rawGender = String(row.jenis_klmn || row.jenis_klmin || '').toUpperCase().trim();
             if (!['L', 'P', 'LAKI-LAKI', 'PEREMPUAN'].includes(rawGender)) {
                 return;
@@ -34,16 +73,12 @@ export const uploadKependudukanExcel = async (req, res) => {
             const gender = (rawGender === 'LAKI-LAKI' || rawGender === 'L') ? 'L' : 'P';
             const umur = parseInt(row.Umur) || 0;
 
-            // 2. CLEANING DATA
             let dusun = String(row['alamat (Dusun)'] || 'TIDAK DIKETAHUI').toUpperCase().trim();
             dusun = dusun.replace(/^DUSUN\s+/i, '');
             if (dusun === 'SONGAI KENIK') dusun = 'SUNGAI KENIK';
 
-            // KELOLA DATA RT
             let rt = String(row.no_rt || row.NO_RT || row.No_RT || 'TIDAK DIKETAHUI').trim();
             if (rt !== 'TIDAK DIKETAHUI') {
-                // Jika tidak ada kata "RT" di depannya, tambahkan otomatis 
-                // padStart(2, '0') digunakan agar RT 1 menjadi RT 01 (lebih rapi untuk diurutkan)
                 if (!rt.toUpperCase().startsWith('RT')) {
                     rt = 'RT ' + rt.padStart(2, '0');
                 } else {
@@ -75,7 +110,6 @@ export const uploadKependudukanExcel = async (req, res) => {
             else if (umur <= 49) kelompokUmur = '22-49 thn';
             else if (umur <= 64) kelompokUmur = '50-64 thn';
 
-            // Pembantu fungsi akumulasi
             const akumulasi = (kategori, label) => {
                 if (!label) return;
                 if (!stats[kategori][label]) {
@@ -92,24 +126,26 @@ export const uploadKependudukanExcel = async (req, res) => {
             akumulasi('PEKERJAAN', pekerjaan);
             akumulasi('PERKAWINAN', statusKawin);
             akumulasi('DUSUN', dusun);
-            akumulasi('RT', rt); // Masukkan hasil hitungan RT
+            akumulasi('RT', rt); 
         });
 
-        // Transaksi Database Prisma
         await prisma.$transaction([
             prisma.kependudukanStat.deleteMany({}),
 
             prisma.kependudukanStat.createMany({
                 data: [
                     ...Object.keys(stats.DUSUN).map(label => ({ type: 'DUSUN', label, maleCount: stats.DUSUN[label].male, femaleCount: stats.DUSUN[label].female, totalCount: stats.DUSUN[label].total })),
-                    ...Object.keys(stats.RT).map(label => ({ type: 'RT', label, maleCount: stats.RT[label].male, femaleCount: stats.RT[label].female, totalCount: stats.RT[label].total })), // Save RT ke Database
+                    ...Object.keys(stats.RT).map(label => ({ type: 'RT', label, maleCount: stats.RT[label].male, femaleCount: stats.RT[label].female, totalCount: stats.RT[label].total })),
                     ...Object.keys(stats.UMUR).map(label => ({ type: 'UMUR', label, maleCount: stats.UMUR[label].male, femaleCount: stats.UMUR[label].female, totalCount: stats.UMUR[label].total })),
                     ...Object.keys(stats.AGAMA).map(label => ({ type: 'AGAMA', label, totalCount: stats.AGAMA[label].total })),
                     ...Object.keys(stats.PENDIDIKAN).map(label => ({ type: 'PENDIDIKAN', label, totalCount: stats.PENDIDIKAN[label].total })),
                     ...Object.keys(stats.PEKERJAAN).map(label => ({ type: 'PEKERJAAN', label, totalCount: stats.PEKERJAAN[label].total })),
                     ...Object.keys(stats.PERKAWINAN).map(label => ({ type: 'PERKAWINAN', label, totalCount: stats.PERKAWINAN[label].total })),
 
-                    { type: 'SUMMARY', label: 'TOTAL_KK', totalCount: uniqueKK.size }
+                    { type: 'SUMMARY', label: 'TOTAL_KK', totalCount: uniqueKK.size },
+                    // --- SIMPAN HASIL PERHITUNGAN LAHIR & MATI ---
+                    { type: 'SUMMARY', label: 'TOTAL_LAHIR', totalCount: totalKelahiran },
+                    { type: 'SUMMARY', label: 'TOTAL_MATI', totalCount: totalKematian }
                 ]
             })
         ]);
@@ -134,18 +170,21 @@ export const getKependudukanData = async (req, res) => {
         const pekerjaanRecords = records.filter(r => r.type === 'PEKERJAAN');
         const agamaRecords = records.filter(r => r.type === 'AGAMA');
         const perkawinanRecords = records.filter(r => r.type === 'PERKAWINAN');
-
-        // Ambil dan urutkan record RT berdasarkan namanya (Misal RT 01, RT 02...)
         const rtRecords = records.filter(r => r.type === 'RT').sort((a, b) => a.label.localeCompare(b.label));
 
+        // --- AMBIL RECORD LAHIR & MATI ---
         const kkRecord = records.find(r => r.type === 'SUMMARY' && r.label === 'TOTAL_KK');
+        const lahirRecord = records.find(r => r.type === 'SUMMARY' && r.label === 'TOTAL_LAHIR');
+        const matiRecord = records.find(r => r.type === 'SUMMARY' && r.label === 'TOTAL_MATI');
 
         const totalPenduduk = dusunRecords.reduce((sum, item) => sum + item.totalCount, 0);
         const totalLakiLaki = dusunRecords.reduce((sum, item) => sum + (item.maleCount || 0), 0);
         const totalPerempuan = dusunRecords.reduce((sum, item) => sum + (item.femaleCount || 0), 0);
         const totalKK = kkRecord ? kkRecord.totalCount : 0;
+        
+        const totalLahir = lahirRecord ? lahirRecord.totalCount : 0;
+        const totalMati = matiRecord ? matiRecord.totalCount : 0;
 
-        // --- KONFIGURASI CHART LAMA ---
         const labelsUmur = ['0-5 thn', '6-12 thn', '13-21 thn', '22-49 thn', '50-64 thn', '65+ thn'];
         const chartDataUmur = {
             labels: labelsUmur,
@@ -180,17 +219,20 @@ export const getKependudukanData = async (req, res) => {
             datasets: [{ label: 'Jumlah Penduduk', data: perkawinanRecords.map(pk => pk.totalCount), backgroundColor: ['#6366f1', '#ec4899', '#f59e0b', '#10b981'], borderWidth: 1 }]
         };
 
-        // --- KONFIGURASI CHART RT (BARU) ---
-        // Karena ada perhitungan laki-laki & perempuan di upload, Anda bebas mau 
-        // menampilkannya berlapis (seperti kelompok umur) atau total saja.
-        // Di sini saya format menjadi Bar Chart tunggal total penduduk per RT.
         const chartDataRT = {
             labels: rtRecords.map(rt => rt.label),
+            datasets: [{ label: 'Jumlah Penduduk per RT', data: rtRecords.map(rt => rt.totalCount), backgroundColor: '#8b5cf6', borderRadius: 6 }]
+        };
+
+        // --- CHART BARU: KELAHIRAN & KEMATIAN ---
+        const chartDataLahirMati = {
+            labels: ['Kelahiran', 'Kematian'],
             datasets: [
                 {
-                    label: 'Jumlah Penduduk per RT',
-                    data: rtRecords.map(rt => rt.totalCount),
-                    backgroundColor: '#8b5cf6', // Warna ungu
+                    label: 'Jumlah Jiwa',
+                    data: [totalLahir, totalMati],
+                    // Kelahiran menggunakan warna Hijau (#10b981), Kematian menggunakan warna Merah (#ef4444)
+                    backgroundColor: ['#10b981', '#ef4444'], 
                     borderRadius: 6
                 }
             ]
@@ -203,16 +245,19 @@ export const getKependudukanData = async (req, res) => {
                 totalPenduduk,
                 totalLakiLaki,
                 totalPerempuan,
-                totalKK
+                totalKK,
+                totalLahir, 
+                totalMati   
             },
             charts: {
                 chartDataUmur,
                 chartDataDusun,
-                chartDataRT, // <-- Masukkan data chart RT ke response
+                chartDataRT,
                 chartDataPendidikan,
                 chartDataPekerjaan,
                 chartDataAgama,
-                chartDataPerkawinan
+                chartDataPerkawinan,
+                chartDataLahirMati // <-- Chart siap ditarik oleh Frontend
             }
         });
 
