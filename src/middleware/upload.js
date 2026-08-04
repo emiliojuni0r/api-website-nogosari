@@ -161,3 +161,62 @@ export const uploadApbdesImages = uploadApbdes.fields([
     { name: 'fotoApbdes', maxCount: 1 },
     { name: 'fotoRealisasi', maxCount: 1 }
 ]);
+
+// 
+// 
+// 
+
+// ==========================================
+// UPLOAD GALERI DESA
+// ==========================================
+const storageGaleri = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/galeri/');
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'galeri-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+export const uploadGaleriImage = multer({
+    storage: storageGaleri,
+    limits: { fileSize: 10 * 1024 * 1024 }, // Maksimal 10MB
+    fileFilter: fileFilter // Menggunakan filter gambar yang sudah ada
+}).single('image');
+
+// 
+// 
+// 
+
+
+// ==========================================
+// UPLOAD DOKUMEN REGULASI
+// ==========================================
+const storageRegulasi = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/regulasi/');
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'regulasi-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+// Filter khusus untuk file dokumen (PDF, DOC, DOCX, XLS, XLSX)
+const documentFilter = (req, file, cb) => {
+    const allowedTypes = /pdf|doc|docx|xls|xlsx/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+
+    if (extname) {
+        return cb(null, true);
+    } else {
+        cb(new Error('Hanya file dokumen (PDF, Word, Excel) yang diperbolehkan!'), false);
+    }
+};
+
+export const uploadRegulasiFile = multer({
+    storage: storageRegulasi,
+    limits: { fileSize: 10 * 1024 * 1024 }, // Maksimal 10MB untuk dokumen
+    fileFilter: documentFilter
+}).single('file'); // Nama field dari frontend adalah 'file'

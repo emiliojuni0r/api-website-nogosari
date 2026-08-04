@@ -148,3 +148,32 @@ model Apbdes {
   narasiRealisasi String   @db.Text
   updatedAt       DateTime @updatedAt
 }
+
+// ==========================================
+// 8. Module Galeri Desa
+// ==========================================
+model KategoriGaleri {
+  id      Int      @id @default(autoincrement())
+  name    String   @unique
+  galeris Galeri[]
+}
+
+model Galeri {
+  id         Int            @id @default(autoincrement())
+  title      String
+  image      String // URL Gambar
+  kategoriId Int
+  kategori   KategoriGaleri @relation(fields: [kategoriId], references: [id], onDelete: Cascade)
+  createdAt  DateTime       @default(now())
+}
+
+// ==========================================
+// 9. Module Regulasi Desa
+// ==========================================
+model Regulasi {
+  id        Int      @id @default(autoincrement())
+  title     String
+  fileUrl   String? // Untuk file yang di-upload ke server (opsional)
+  linkUrl   String? // Untuk link Google Drive (opsional)
+  createdAt DateTime @default(now())
+}

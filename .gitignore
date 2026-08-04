@@ -32,6 +32,8 @@ uploads/**
 !uploads/profil/
 !uploads/pemetaan/
 !uploads/apbdes/
+!uploads/galeri/
+!uploads/regulasi/
 
 # Biar folder kosong tetap ikut git
 !uploads/**/.gitkeep

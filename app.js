@@ -18,6 +18,8 @@ import pemetaanRoutes from './src/routes/pemetaanRoutes.js';
 import footerRoutes from './src/routes/footerRoutes.js';
 import categoryArtikelRoutes from './src/routes/categoryArtikelRoutes.js';
 import apbdesRoutes from './src/routes/apbdesRoutes.js';
+import galeriRoutes from './src/routes/galeriRoutes.js';
+import regulasiRoutes from './src/routes/regulasiRoutes.js';
 import path from 'path';
 
 dotenv.config();
@@ -66,6 +68,8 @@ app.use('/api/pemetaan', pemetaanRoutes);
 app.use('/api/footer', footerRoutes);
 app.use('/api/categoryartikel', categoryArtikelRoutes);
 app.use('/api/apbdes', apbdesRoutes);
+app.use('/api/galeri', galeriRoutes);
+app.use('/api/regulasi', regulasiRoutes);
 
 
 // CENTRALIZED ERROR HANDLER
